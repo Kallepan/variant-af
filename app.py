@@ -12,19 +12,22 @@ INPUT_PATH = "input"
 OUTPUT_PATH = "results"
 REPORT_FILE = "altaf_report.docx"
 REPORT_TEMPLATE = "template.docx"
-ALTAF_CUTOFF = 0.8
+ALTAF_CUTOFF = 0.9
 ALTAF_KEY = "AltAF"
 ROUND_VALUE = 4
 
 def read_data(file_path):
     df = pd.read_csv(file_path)
     
+    n_before_filter = df[ALTAF_KEY].count()
     df[ALTAF_KEY] = pd.to_numeric(df[ALTAF_KEY], errors="coerce")
     df = df.loc[df[ALTAF_KEY] < ALTAF_CUTOFF]
 
-    return df
+    n_after_filter = df[ALTAF_KEY].count()
 
-def calc_stats(df: pd.DataFrame) -> dict:
+    return df, n_before_filter - n_after_filter
+
+def calc_stats(df: pd.DataFrame, n_filtered: int) -> dict:
     count = df[ALTAF_KEY].count()
     min = df[ALTAF_KEY].min()
     max = df[ALTAF_KEY].max()
@@ -44,7 +47,8 @@ def calc_stats(df: pd.DataFrame) -> dict:
         "median": round(median, ROUND_VALUE),
         "count": round(count, ROUND_VALUE),
         "std": round(std, ROUND_VALUE),
-        "confidence_interval_95%": f"{confidence_lower} - {confidence_upper}"
+        "confidence_interval_95%": f"{confidence_lower} - {confidence_upper}",
+        f"entfernte_varianten: > {ALTAF_CUTOFF}": n_filtered,
     }
 
 def create_histogram(df: pd.DataFrame, file_name: str):
@@ -70,8 +74,8 @@ def main():
     template = DocxTemplate(REPORT_TEMPLATE)
     for file in input_files:
 
-        df = read_data(os.path.join(INPUT_PATH, file))
-        stats = calc_stats(df)
+        df, n_filtered = read_data(os.path.join(INPUT_PATH, file))
+        stats = calc_stats(df, n_filtered)
         image_file_name = file.replace(".csv", ".png")
         create_histogram(df, image_file_name)
 
