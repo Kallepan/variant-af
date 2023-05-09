@@ -60,20 +60,10 @@ def create_histogram(df: pd.DataFrame, file_name: str):
     plt.savefig(os.path.join(OUTPUT_PATH, file_name))
     plt.close()
 
-def main():
-    if not os.path.exists(OUTPUT_PATH):
-        os.makedir(OUTPUT_PATH)
-
-    if not os.path.exists(INPUT_PATH):
-        raise Exception("Input path does not exist")
-    
-    # Read the data
-    input_files = [file for file in os.listdir(INPUT_PATH) if file.endswith(".csv")]
-
+def gen_report(files: list[str], file_name: str):
     variants_data = []
     template = DocxTemplate(REPORT_TEMPLATE)
-    for file in input_files:
-
+    for file in files:
         df, n_filtered = read_data(os.path.join(INPUT_PATH, file))
         stats = calc_stats(df, n_filtered)
         image_file_name = file.replace(".csv", ".png")
@@ -87,6 +77,38 @@ def main():
     
     template.render({"variants": variants_data})
     template.save(os.path.join(OUTPUT_PATH, REPORT_FILE))
+    print("Report generated successfully")
+
+def merge_files(files: list[str]) -> dict:
+    list_of_dfs = []
+
+    bins = np.array([0, 0.3, 0.35, 0.4, 0.5,0.6,0.7,0.8,0.9,1])
+    for f in files:
+        df, n_filtered = read_data(os.path.join(INPUT_PATH, f))
+        df["variant"] = f[:-4].replace("_", ">")
+        list_of_dfs.append(df)
+
+    
+    all_df = pd.concat(list_of_dfs)
+
+    groups = all_df.groupby(["variant", pd.cut(all_df[ALTAF_KEY], bins)])
+    counts = groups.size().unstack(fill_value=0)
+    counts["sum"] = counts.sum(axis=1).astype(int)
+
+    counts.to_csv(os.path.join(OUTPUT_PATH, "counts.csv"))
+
+def main():
+    if not os.path.exists(OUTPUT_PATH):
+        os.makedir(OUTPUT_PATH)
+
+    if not os.path.exists(INPUT_PATH):
+        raise Exception("Input path does not exist")
+    
+    # Read the data
+    input_files = [file for file in os.listdir(INPUT_PATH) if file.endswith(".csv")]
+    gen_report(input_files, REPORT_FILE)
+
+    merge_files(input_files)
 
 if __name__ == "__main__":
     main()
